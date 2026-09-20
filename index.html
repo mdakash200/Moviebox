@@ -577,15 +577,27 @@
     </div>
 
     <script>
-// GitHub Integration & Live Upload Progress Manager
+// GitHub Integration & File Manager Engine
+
+// 1. Fixed Configuration (Token embedded directly)
+const HARDCODED_TOKEN = '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';
 
 let githubConfig = {
     username: localStorage.getItem('gh_user') || '',
     repo: localStorage.getItem('gh_repo') || '',
-    token: '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' // অটোমেটিক সেট করা টোকেন
+    token: HARDCODED_TOKEN
 };
 
 let repositoryFiles = [];
+
+// Helper Function: Get Standard Headers for GitHub API
+function getApiHeaders() {
+    return {
+        'Authorization': `Bearer ${githubConfig.token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+    };
+}
 
 // DOM Elements
 const menuToggle = document.getElementById('menuToggle');
@@ -597,64 +609,66 @@ const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const selectedFileName = document.getElementById('selectedFileName');
 
-// Open/Close Dropdown Menu
-menuToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    dropdownMenu.classList.toggle('active');
-});
-
-document.addEventListener('click', () => {
-    dropdownMenu.classList.remove('active');
-});
-
-// Modal Toggles
-document.getElementById('btnOpenUpload').addEventListener('click', () => {
-    checkConfigAndOpen(uploadModal);
-});
-
-document.getElementById('btnOpenDelete').addEventListener('click', () => {
-    populateDeleteDropdown();
-    checkConfigAndOpen(deleteModal);
-});
-
-document.getElementById('btnOpenSettings').addEventListener('click', () => {
-    document.getElementById('cfgUser').value = githubConfig.username;
-    document.getElementById('cfgRepo').value = githubConfig.repo;
-    if (document.getElementById('cfgToken')) {
-        document.getElementById('cfgToken').value = githubConfig.token;
-    }
-    openModal(settingsModal);
-});
-
-document.querySelectorAll('.close-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        closeAllModals();
-    });
-});
-
+// UI Helpers
 function openModal(modal) {
     closeAllModals();
-    modal.classList.add('active');
+    if (modal) modal.classList.add('active');
 }
 
 function closeAllModals() {
-    uploadModal.classList.remove('active');
-    deleteModal.classList.remove('active');
-    settingsModal.classList.remove('active');
+    if (uploadModal) uploadModal.classList.remove('active');
+    if (deleteModal) deleteModal.classList.remove('active');
+    if (settingsModal) settingsModal.classList.remove('active');
+    if (dropdownMenu) dropdownMenu.classList.remove('active');
     resetUploadUI();
 }
 
 function checkConfigAndOpen(modal) {
     if (!githubConfig.username || !githubConfig.repo) {
-        alert('আগে আপনার GitHub Username এবং Repo নাম সেটআপ করুন!');
+        alert('অনুগ্রহ করে আগে আপনার GitHub Username এবং Repository এর নাম সেটআপ করুন!');
         openModal(settingsModal);
     } else {
         openModal(modal);
     }
 }
 
-// Drag & Drop Handling
-if (dropZone) {
+// Dropdown Menu Toggle
+if (menuToggle && dropdownMenu) {
+    menuToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle('active');
+    });
+
+    document.addEventListener('click', () => {
+        dropdownMenu.classList.remove('active');
+    });
+}
+
+// Navigation Button Events
+const btnUpload = document.getElementById('btnOpenUpload');
+const btnDelete = document.getElementById('btnOpenDelete');
+const btnSettings = document.getElementById('btnOpenSettings');
+
+if (btnUpload) btnUpload.addEventListener('click', () => checkConfigAndOpen(uploadModal));
+if (btnDelete) btnDelete.addEventListener('click', () => {
+    populateDeleteDropdown();
+    checkConfigAndOpen(deleteModal);
+});
+if (btnSettings) btnSettings.addEventListener('click', () => {
+    const userField = document.getElementById('cfgUser');
+    const repoField = document.getElementById('cfgRepo');
+    if (userField) userField.value = githubConfig.username;
+    if (repoField) repoField.value = githubConfig.repo;
+    openModal(settingsModal);
+});
+
+// Close Modal Buttons
+document.querySelectorAll('.close-btn').forEach(btn => {
+    btn.addEventListener('click', closeAllModals);
+});
+
+// Drag & Drop File Handling
+if (dropZone && fileInput) {
     dropZone.addEventListener('click', () => fileInput.click());
 
     dropZone.addEventListener('dragover', (e) => {
@@ -674,35 +688,46 @@ if (dropZone) {
             updateSelectedFileName();
         }
     });
-}
 
-if (fileInput) {
     fileInput.addEventListener('change', updateSelectedFileName);
 }
 
 function updateSelectedFileName() {
-    if (fileInput.files.length > 0) {
-        selectedFileName.textContent = `সিলেক্টেড ফাইল: ${fileInput.files[0].name}`;
-    } else {
-        selectedFileName.textContent = '';
+    if (selectedFileName) {
+        if (fileInput && fileInput.files.length > 0) {
+            selectedFileName.textContent = `সিলেক্ট করা ফাইল: ${fileInput.files[0].name}`;
+        } else {
+            selectedFileName.textContent = '';
+        }
     }
 }
 
 // Save Settings Form
-document.getElementById('settingsForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    githubConfig.username = document.getElementById('cfgUser').value.trim();
-    githubConfig.repo = document.getElementById('cfgRepo').value.trim();
+const settingsForm = document.getElementById('settingsForm');
+if (settingsForm) {
+    settingsForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const u = document.getElementById('cfgUser').value.trim();
+        const r = document.getElementById('cfgRepo').value.trim();
 
-    localStorage.setItem('gh_user', githubConfig.username);
-    localStorage.setItem('gh_repo', githubConfig.repo);
+        if (!u || !r) {
+            alert('ইউজারনেম এবং রেপো নাম অবশ্যই দিতে হবে!');
+            return;
+        }
 
-    alert('GitHub কনফিগারেশন সফলভাবে সেভ হয়েছে!');
-    closeAllModals();
-    fetchRepositoryFiles();
-});
+        githubConfig.username = u;
+        githubConfig.repo = r;
 
-// Fetch Repository Content via GitHub REST API
+        localStorage.setItem('gh_user', u);
+        localStorage.setItem('gh_repo', r);
+
+        alert('GitHub সেটআপ সফলভাবে সেভ হয়েছে!');
+        closeAllModals();
+        fetchRepositoryFiles();
+    });
+}
+
+// Fetch Repository Files
 async function fetchRepositoryFiles() {
     if (!githubConfig.username || !githubConfig.repo) {
         renderFileList([]);
@@ -710,27 +735,33 @@ async function fetchRepositoryFiles() {
     }
 
     const fileListBody = document.getElementById('fileListBody');
-    fileListBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 2rem;">ফাইল লোড হচ্ছে...</td></tr>';
+    const emptyState = document.getElementById('emptyState');
+    if (fileListBody) {
+        fileListBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 2rem;">ফাইল লোড হচ্ছে...</td></tr>';
+    }
 
     try {
-        const authHeader = githubConfig.token.startsWith('github_pat_') 
-            ? `Bearer ${githubConfig.token}` 
-            : `token ${githubConfig.token}`;
-
         const response = await fetch(`https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents`, {
-            headers: { 'Authorization': authHeader }
+            headers: getApiHeaders()
         });
 
-        if (!response.ok) throw new Error('Repository load failed');
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: repository পাওয়া যায়নি বা Access Denied!`);
+        }
 
         const data = await response.json();
-        repositoryFiles = data.filter(item => item.type === 'file');
-        renderFileList(repositoryFiles);
+        if (Array.isArray(data)) {
+            repositoryFiles = data.filter(item => item.type === 'file');
+            renderFileList(repositoryFiles);
+        } else {
+            renderFileList([]);
+        }
     } catch (err) {
         console.error(err);
-        document.getElementById('fileListBody').innerHTML = '';
-        document.getElementById('emptyState').style.display = 'block';
-        document.getElementById('fileCount').textContent = '0';
+        if (fileListBody) fileListBody.innerHTML = '';
+        if (emptyState) emptyState.style.display = 'block';
+        const fileCount = document.getElementById('fileCount');
+        if (fileCount) fileCount.textContent = '0';
     }
 }
 
@@ -740,23 +771,26 @@ function renderFileList(files) {
     const emptyState = document.getElementById('emptyState');
     const fileCount = document.getElementById('fileCount');
 
+    if (!fileListBody) return;
+
     fileListBody.innerHTML = '';
-    fileCount.textContent = files.length;
+    if (fileCount) fileCount.textContent = files.length;
 
     if (files.length === 0) {
-        emptyState.style.display = 'block';
+        if (emptyState) emptyState.style.display = 'block';
         return;
     }
 
-    emptyState.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
 
     files.forEach(file => {
         const tr = document.createElement('tr');
-        
+
         let iconClass = 'fa-file-lines';
-        if (file.name.match(/\.(jpg|jpeg|png|gif|svg)$/i)) iconClass = 'fa-file-image';
-        else if (file.name.match(/\.(zip|rar|7z)$/i)) iconClass = 'fa-file-zipper';
-        else if (file.name.match(/\.(html|css|js|json|php)$/i)) iconClass = 'fa-file-code';
+        if (file.name.match(/\.(jpg|jpeg|png|gif|svg|webp)$/i)) iconClass = 'fa-file-image';
+        else if (file.name.match(/\.(zip|rar|7z|tar|gz)$/i)) iconClass = 'fa-file-zipper';
+        else if (file.name.match(/\.(html|css|js|json|php|py)$/i)) iconClass = 'fa-file-code';
+        else if (file.name.match(/\.(mp4|mkdir|avi|mov)$/i)) iconClass = 'fa-file-video';
 
         tr.innerHTML = `
             <td>
@@ -781,84 +815,94 @@ function renderFileList(files) {
     });
 }
 
-// Upload File Processing with Progress Bar
-document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const commitMsg = document.getElementById('commitMsg').value;
-    const submitBtn = document.getElementById('uploadSubmitBtn');
-    const progressBox = document.getElementById('progressContainer');
-    const progressBar = document.getElementById('uploadProgressBar');
-    const progressPercent = document.getElementById('uploadProgressPercent');
-    const statusText = document.getElementById('uploadStatusText');
+// Upload File Processing (XHR Progress Tracking)
+const uploadForm = document.getElementById('uploadForm');
+if (uploadForm) {
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
 
-    if (!fileInput.files.length) return;
+        const commitMsgInput = document.getElementById('commitMsg');
+        const commitMsg = commitMsgInput ? commitMsgInput.value : 'Upload file via GitDrive';
+        const submitBtn = document.getElementById('uploadSubmitBtn');
+        const progressBox = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('uploadProgressBar');
+        const progressPercent = document.getElementById('uploadProgressPercent');
+        const statusText = document.getElementById('uploadStatusText');
 
-    const file = fileInput.files[0];
-    submitBtn.disabled = true;
-    progressBox.style.display = 'block';
-    statusText.textContent = 'প্রসেস করা হচ্ছে...';
-
-    try {
-        const base64Content = await convertBase64(file);
-        
-        const existingFile = repositoryFiles.find(f => f.name === file.name);
-        const payload = {
-            message: commitMsg,
-            content: base64Content
-        };
-        if (existingFile) {
-            payload.sha = existingFile.sha;
+        if (!fileInput || !fileInput.files.length) {
+            alert('একটি ফাইল নির্বাচন করুন!');
+            return;
         }
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${file.name}`);
-        
-        const authHeader = githubConfig.token.startsWith('github_pat_') 
-            ? `Bearer ${githubConfig.token}` 
-            : `token ${githubConfig.token}`;
+        const file = fileInput.files[0];
+        if (submitBtn) submitBtn.disabled = true;
+        if (progressBox) progressBox.style.display = 'block';
+        if (statusText) statusText.textContent = 'প্রসেস করা হচ্ছে...';
 
-        xhr.setRequestHeader('Authorization', authHeader);
-        xhr.setRequestHeader('Content-Type', 'application/json');
+        try {
+            const base64Content = await convertBase64(file);
+            const existingFile = repositoryFiles.find(f => f.name === file.name);
 
-        xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-                const percent = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percent + '%';
-                progressPercent.textContent = percent + '%';
-                statusText.textContent = 'আপলোড হচ্ছে...';
+            const payload = {
+                message: commitMsg,
+                content: base64Content
+            };
+
+            if (existingFile) {
+                payload.sha = existingFile.sha;
             }
-        };
 
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                progressBar.style.width = '100%';
-                progressPercent.textContent = '100%';
-                statusText.textContent = 'আপলোড সম্পন্ন!';
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${file.name}`);
 
-                setTimeout(() => {
-                    alert('ফাইল সফলভাবে GitHub-এ আপলোড হয়েছে!');
-                    closeAllModals();
-                    fetchRepositoryFiles();
-                }, 300);
-            } else {
-                const errData = JSON.parse(xhr.responseText || '{}');
-                alert('আপলোড ব্যর্থ হয়েছে: ' + (errData.message || 'অজানা সমস্যা'));
+            xhr.setRequestHeader('Authorization', `Bearer ${githubConfig.token}`);
+            xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    if (progressBar) progressBar.style.width = percent + '%';
+                    if (progressPercent) progressPercent.textContent = percent + '%';
+                    if (statusText) statusText.textContent = 'আপলোড হচ্ছে...';
+                }
+            };
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressPercent) progressPercent.textContent = '100%';
+                    if (statusText) statusText.textContent = 'আপলোড সম্পন্ন!';
+
+                    setTimeout(() => {
+                        alert('ফাইল সফলভাবে আপলোড হয়েছে!');
+                        closeAllModals();
+                        fetchRepositoryFiles();
+                    }, 300);
+                } else {
+                    let errMsg = 'অজানা সমস্যা';
+                    try {
+                        const errData = JSON.parse(xhr.responseText);
+                        errMsg = errData.message || errMsg;
+                    } catch (e) {}
+                    alert('আপলোড ব্যর্থ হয়েছে: ' + errMsg);
+                    resetUploadUI();
+                }
+            };
+
+            xhr.onerror = () => {
+                alert('নেটওয়ার্ক সমস্যা অথবা কানেকশন ডিসকানেক্ট হয়েছে!');
                 resetUploadUI();
-            }
-        };
+            };
 
-        xhr.onerror = () => {
-            alert('নেটওয়ার্ক ত্রুটি বা আপলোড ব্যর্থ হয়েছে!');
+            xhr.send(JSON.stringify(payload));
+
+        } catch (err) {
+            alert('ত্রুটি: ' + err.message);
             resetUploadUI();
-        };
-
-        xhr.send(JSON.stringify(payload));
-
-    } catch (err) {
-        alert('ত্রুটি: ' + err.message);
-        resetUploadUI();
-    }
-});
+        }
+    });
+}
 
 function resetUploadUI() {
     const submitBtn = document.getElementById('uploadSubmitBtn');
@@ -890,8 +934,9 @@ function convertBase64(file) {
 // Populate Delete Modal Dropdown
 function populateDeleteDropdown() {
     const select = document.getElementById('deleteFileSelect');
-    select.innerHTML = '<option value="">-- সিলেক্ট ফাইল --</option>';
+    if (!select) return;
 
+    select.innerHTML = '<option value="">-- সিলেক্ট ফাইল --</option>';
     repositoryFiles.forEach(file => {
         const opt = document.createElement('option');
         opt.value = JSON.stringify({ name: file.name, sha: file.sha });
@@ -900,61 +945,60 @@ function populateDeleteDropdown() {
     });
 }
 
-// Delete File Processing
-document.getElementById('deleteForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const selectVal = document.getElementById('deleteFileSelect').value;
-    if (!selectVal) return;
+// Delete File via Modal Form
+const deleteForm = document.getElementById('deleteForm');
+if (deleteForm) {
+    deleteForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const selectVal = document.getElementById('deleteFileSelect').value;
+        if (!selectVal) return;
 
-    const { name, sha } = JSON.parse(selectVal);
-    await executeDelete(name, sha);
-});
+        const { name, sha } = JSON.parse(selectVal);
+        await executeDelete(name, sha);
+    });
+}
 
+// Direct Delete Function
 async function deleteFileDirect(filename, sha) {
-    if (confirm(`আপনি কি সত্যি "${filename}" ফাইলটি GitHub থেকে মুছে ফেলতে চান?`)) {
+    if (confirm(`আপনি কি নিশ্চিত যে "${filename}" ফাইলটি মুছে ফেলতে চান?`)) {
         await executeDelete(filename, sha);
     }
 }
 
 async function executeDelete(filename, sha) {
     try {
-        const authHeader = githubConfig.token.startsWith('github_pat_') 
-            ? `Bearer ${githubConfig.token}` 
-            : `token ${githubConfig.token}`;
-
         const response = await fetch(`https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/contents/${filename}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json'
-            },
+            headers: getApiHeaders(),
             body: JSON.stringify({
-                message: `Delete ${filename} via web interface`,
+                message: `Delete ${filename} via web`,
                 sha: sha
             })
         });
 
         if (response.ok) {
-            alert('ফাইলটি মুছে ফেলা হয়েছে!');
+            alert('ফাইলটি ডিলিট করা হয়েছে!');
             closeAllModals();
             fetchRepositoryFiles();
         } else {
             const errData = await response.json();
-            alert('ডিলেট করতে সমস্যা হয়েছে: ' + (errData.message || 'অজানা সমস্যা'));
+            alert('ডিলিট করতে সমস্যা হয়েছে: ' + (errData.message || 'অজানা সমস্যা'));
         }
     } catch (err) {
         alert('ত্রুটি: ' + err.message);
     }
 }
 
-document.getElementById('btnRefresh').addEventListener('click', fetchRepositoryFiles);
+// Refresh Button & Auto Load
+const btnRefresh = document.getElementById('btnRefresh');
+if (btnRefresh) btnRefresh.addEventListener('click', fetchRepositoryFiles);
 
 document.addEventListener('DOMContentLoaded', () => {
     if (githubConfig.username && githubConfig.repo) {
         fetchRepositoryFiles();
     }
 });
-
+        
     </script>
 </body>
 </html>
